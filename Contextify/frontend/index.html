@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Contextify - check a forward before you share it</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+  <nav class="top"><span class="logo"></span><b>Contextify</b></nav>
+
+  <section id="input-view">
+    <span class="pill">Fact-check in seconds</span>
+    <h1>Got a forward that feels off? <span class="grad">Check it first.</span></h1>
+    <p class="lead">Paste any message. We search fact-checkers and news in India, the US and the UK, then write you a reply with proof.</p>
+    <div class="glass">
+      <label for="claim">Message or claim</label>
+      <textarea id="claim" rows="6" maxlength="3000" placeholder="Paste a WhatsApp forward here..."></textarea>
+      <button id="check-btn" class="primary">Check this message</button>
+    </div>
+    <div class="examples">
+      <span>Try one:</span>
+      <button class="chip" data-text="Drinking hot water with lemon every morning cures cancer.">Cancer cure</button>
+      <button class="chip" data-text="Government will give Rs 5000 to every family who forwards this message to 10 people.">Free money</button>
+      <button class="chip" data-text="WhatsApp will start charging Rs 99 per month from next week unless you forward this.">WhatsApp charges</button>
+    </div>
+  </section>
+
+  <section id="loading-view" class="glass" hidden aria-live="polite">
+    <h2>Checking your message</h2>
+    <ol id="steps">
+      <li>Reading the claim</li>
+      <li>Checking fact-checkers</li>
+      <li>Searching India, US and UK news</li>
+      <li>Writing the summary</li>
+    </ol>
+  </section>
+
+  <section id="error-view" class="glass" hidden role="alert">
+    <h2>Something went wrong</h2>
+    <p id="error-text">We could not get a result. Try again.</p>
+    <button id="retry-btn" class="primary">Try again</button>
+  </section>
+
+  <section id="result-view" hidden>
+    <p id="demo-note" class="demo" hidden>Demo data: the backend is not connected yet.</p>
+    <div id="badge" class="badge"></div>
+    <div class="glass">
+      <h2>The claim</h2>
+      <blockquote id="claim-echo"></blockquote>
+      <h2>What we found</h2>
+      <p id="summary"></p>
+      <h2>Sources</h2>
+      <ul id="sources"></ul>
+      <h2>Red flags</h2>
+      <ul id="flags"></ul>
+      <h2>Reply you can send</h2>
+      <p id="reply" class="reply"></p>
+      <div class="row">
+        <button id="copy-btn" class="primary">Copy reply</button>
+        <button id="again-btn">Check another message</button>
+      </div>
+    </div>
+  </section>
+</div>
+<script src="script.js"></script>
+</body>
+</html>

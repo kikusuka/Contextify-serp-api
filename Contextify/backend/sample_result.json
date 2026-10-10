@@ -1,0 +1,12 @@
+{
+  "claim": "The government is giving Rs 5000 to every student",
+  "status": "Already fact-checked",
+  "summary": "A fact-checking outlet has already reviewed this claim and rated it misleading. Regional news outlets in India, the US and the UK do not report any such scheme.",
+  "sources": [
+    {"title": "Example fact-check: No Rs 5000 student scheme", "link": "https://example.com/fact-check", "source": "Example Fact Check", "date": "2026-09-01", "region": "Fact-checker", "type": "factcheck"},
+    {"title": "Example news report", "link": "https://example.com/news", "source": "Example News", "date": "2026-09-02", "region": "India", "type": "news"}
+  ],
+  "red_flags": ["Promises money with no official source", "Asks you to click an unknown link"],
+  "reply_message": "I checked this and a fact-checking site has already marked it as misleading. Please do not click the link. Here is the source: https://example.com/fact-check",
+  "meta": {"missing": [], "evidence_count": 6, "regions_searched": ["Fact-checker", "India", "UK", "US"], "cached": false}
+}
