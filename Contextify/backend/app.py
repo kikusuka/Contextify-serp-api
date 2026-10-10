@@ -1,50 +1,56 @@
 """
 Contextify backend (Role 1: Backend Lead)
 
+API keys come from the web page, not from a .env file. The page sends them with each
+request in two headers (X-Gemini-Key, X-SerpApi-Key). The server uses them for that one
+request and never stores or logs them. (If a header is missing we fall back to the
+GEMINI_API_KEY / SERPAPI_API_KEY environment variables, which is optional.)
+
 Flow for POST /analyze:
   1. Gemini extracts the core claim from the user's message
   2. Fact-check search + regional news search run IN PARALLEL (teammates' modules)
   3. Gemini turns the evidence into: status, summary, red flags, reply message
   4. We rebuild the sources list ourselves from the evidence, so Gemini can never invent a link
 
-Teammates' modules (put next to this file):
-  factcheck.py      -> search_factchecks(claim)  -> list of evidence items
-  regional_news.py  -> get_regional_news(claim)  -> {"India": [...], "US": [...], "UK": [...]}
-Evidence item = {"title", "link", "source", "date", "snippet"}
+Other endpoints:  POST /check-keys (tests the two keys)   GET /health
 
 Run:  python app.py      (from inside the backend folder)
 """
 import json
 import os
+import urllib.error
+import urllib.parse
+import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 
-from dotenv import load_dotenv
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from google import genai
 
-load_dotenv()
+try:  # optional: lets developers keep keys in a .env file instead of typing them
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 
 # --- teammates' modules (app still runs if they are not written yet) ---
 try:
     from factcheck import search_factchecks
 except ImportError:
-    def search_factchecks(claim):
+    def search_factchecks(claim, api_key=None):
         return []
 
 try:
     from regional_news import get_regional_news
 except ImportError:
-    def get_regional_news(claim):
+    def get_regional_news(claim, api_key=None):
         return {}
 
 app = Flask(__name__)
 CORS(app)  # lets the standalone index.html talk to localhost:5000
 
-# Set GEMINI_MODEL in .env if this model name is retired. Check Google AI Studio for current names.
+# Set GEMINI_MODEL in the environment if this model name is retired.
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
-API_KEY = os.getenv("GEMINI_API_KEY")
-client = genai.Client(api_key=API_KEY) if API_KEY else None
 
 STATUSES = ["Already fact-checked", "Corroborated", "Disputed", "No evidence found"]
 _cache = {}  # claim -> result. Saves SerpApi credits while testing and demoing.
@@ -87,7 +93,24 @@ EVIDENCE:
 """
 
 
-def ask_gemini(prompt, json_mode=False):
+# ---------------------------------------------------------------- keys & safety
+def get_keys():
+    """Keys sent by the web page (headers), falling back to environment variables."""
+    gemini = (request.headers.get("X-Gemini-Key") or os.getenv("GEMINI_API_KEY") or "").strip()
+    serp = (request.headers.get("X-SerpApi-Key") or os.getenv("SERPAPI_API_KEY") or "").strip()
+    return gemini, serp
+
+
+def redact(text, *secrets):
+    """Remove API keys from any message before it is sent back or shown."""
+    text = str(text)
+    for secret in secrets:
+        if secret and len(secret) >= 6:
+            text = text.replace(secret, "[hidden key]")
+    return text
+
+
+def ask_gemini(client, prompt, json_mode=False):
     config = {"temperature": 0.2}
     if json_mode:
         config["response_mime_type"] = "application/json"
@@ -95,34 +118,35 @@ def ask_gemini(prompt, json_mode=False):
     return resp.text or ""
 
 
-def extract_claim(text):
+# ---------------------------------------------------------------- pipeline
+def extract_claim(client, text):
     try:
-        claim = ask_gemini(EXTRACT_PROMPT.format(text=text)).strip().strip('"')
+        claim = ask_gemini(client, EXTRACT_PROMPT.format(text=text)).strip().strip('"')
         return claim or text[:300]
     except Exception:
         return text[:300]  # fall back to the raw message so the app still works
 
 
-def safe_call(fn, claim, fallback, label, missing):
+def safe_call(fn, claim, serp_key, fallback, label, missing):
     try:
-        return fn(claim)
+        return fn(claim, api_key=serp_key)
     except Exception as e:
-        missing.append(f"{label} search failed: {e}")
+        missing.append(f"{label} search failed: {redact(e, serp_key)}")
         return fallback
 
 
-def gather_evidence(claim):
+def gather_evidence(claim, serp_key):
     """Runs both searches in parallel. Returns (numbered evidence list, list of problems)."""
     missing = []
     with ThreadPoolExecutor(max_workers=2) as pool:
-        f_fc = pool.submit(safe_call, search_factchecks, claim, [], "Fact-check", missing)
-        f_rg = pool.submit(safe_call, get_regional_news, claim, {}, "Regional news", missing)
+        f_fc = pool.submit(safe_call, search_factchecks, claim, serp_key, [], "Fact-check", missing)
+        f_rg = pool.submit(safe_call, get_regional_news, claim, serp_key, {}, "Regional news", missing)
         factchecks, regions = f_fc.result(), f_rg.result()
 
     # Regional module may return {"India": [...]} or {"regions": {...}, "errors": {...}}
     if isinstance(regions, dict) and "regions" in regions:
         for name, err in (regions.get("errors") or {}).items():
-            missing.append(f"{name} news search failed: {err}")
+            missing.append(f"{name} news search failed: {redact(err, serp_key)}")
         regions = regions["regions"]
     if not isinstance(regions, dict):
         regions = {}
@@ -157,7 +181,7 @@ def evidence_for_prompt(evidence):
     return "\n".join(lines) if lines else "(no evidence found)"
 
 
-def build_result(text, claim, evidence, missing):
+def build_result(client, text, claim, evidence, missing):
     if not evidence:  # nothing to analyse: say so honestly, and skip the Gemini call
         return {
             "claim": claim,
@@ -171,6 +195,7 @@ def build_result(text, claim, evidence, missing):
         }
 
     raw = ask_gemini(
+        client,
         ANALYZE_PROMPT.format(text=text, claim=claim, evidence=evidence_for_prompt(evidence)),
         json_mode=True,
     )
@@ -198,15 +223,70 @@ def build_result(text, claim, evidence, missing):
     }
 
 
+# ---------------------------------------------------------------- key testing
+def check_gemini(key):
+    if not key:
+        return {"ok": False, "message": "No Gemini key entered."}
+    try:
+        reply = ask_gemini(genai.Client(api_key=key), "Reply with the single word OK.")
+        return {"ok": True, "message": "Gemini key works."} if reply else \
+               {"ok": False, "message": "Gemini returned an empty reply."}
+    except Exception as e:
+        msg = redact(e, key)
+        if "API key not valid" in msg or "API_KEY_INVALID" in msg:
+            return {"ok": False, "message": "Gemini says this key is not valid."}
+        return {"ok": False, "message": "Gemini check failed: " + msg[:160]}
+
+
+def check_serpapi(key):
+    """Uses SerpApi's account endpoint, which does not use up search credits."""
+    if not key:
+        return {"ok": False, "message": "No SerpApi key entered."}
+    for url in ("https://serpapi.com/account.json?api_key=", "https://serpapi.com/account?api_key="):
+        try:
+            with urllib.request.urlopen(url + urllib.parse.quote(key), timeout=10) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as e:
+            if e.code in (401, 403):
+                return {"ok": False, "message": "SerpApi says this key is not valid."}
+            continue
+        except Exception:
+            continue
+        if isinstance(data, dict) and data.get("error"):
+            return {"ok": False, "message": "SerpApi says this key is not valid."}
+        left = data.get("total_searches_left", data.get("plan_searches_left")) if isinstance(data, dict) else None
+        msg = "SerpApi key works." + (f" {left} searches left." if left is not None else "")
+        return {"ok": True, "message": msg}
+    return {"ok": None, "message": "Could not verify the SerpApi key right now. It will be tested on your first check."}
+
+
+# ---------------------------------------------------------------- routes
 @app.get("/health")
 def health():
-    return jsonify({"ok": True, "model": GEMINI_MODEL, "gemini_key_loaded": client is not None})
+    return jsonify({
+        "ok": True,
+        "model": GEMINI_MODEL,
+        "keys_in_environment": {
+            "gemini": bool(os.getenv("GEMINI_API_KEY")),
+            "serpapi": bool(os.getenv("SERPAPI_API_KEY")),
+        },
+    })
+
+
+@app.post("/check-keys")
+def check_keys():
+    gemini_key, serp_key = get_keys()
+    return jsonify({"gemini": check_gemini(gemini_key), "serpapi": check_serpapi(serp_key)})
 
 
 @app.post("/analyze")
 def analyze():
-    if client is None:
-        return jsonify({"error": "GEMINI_API_KEY missing. Add it to your .env file."}), 500
+    gemini_key, serp_key = get_keys()
+    if not gemini_key or not serp_key:
+        return jsonify({
+            "error": "Please add your Gemini and SerpApi keys in the API keys box first.",
+            "code": "missing_keys",
+        }), 401
 
     body = request.get_json(silent=True) or {}
     text = (body.get("claim") or "").strip()[:2000]
@@ -217,11 +297,12 @@ def analyze():
         return jsonify({**_cache[text], "meta": {**_cache[text]["meta"], "cached": True}})
 
     try:
-        claim = extract_claim(text)
-        evidence, missing = gather_evidence(claim)
-        result = build_result(text, claim, evidence, missing)
+        client = genai.Client(api_key=gemini_key)
+        claim = extract_claim(client, text)
+        evidence, missing = gather_evidence(claim, serp_key)
+        result = build_result(client, text, claim, evidence, missing)
     except Exception as e:
-        return jsonify({"error": f"Analysis failed: {e}"}), 502
+        return jsonify({"error": "Analysis failed: " + redact(e, gemini_key, serp_key)}), 502
 
     result["meta"] = {
         "missing": missing,
@@ -234,4 +315,4 @@ def analyze():
 
 
 if __name__ == "__main__":
-    app.run(port=5000, debug=True)
+    app.run(port=5000, debug=False)

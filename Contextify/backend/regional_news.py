@@ -9,7 +9,8 @@ the UK (gl=in / us / gb) in parallel and returns:
 
 item = {"title", "link", "source_name", "date", "snippet", "is_mock"}
 
-Needs SERPAPI_API_KEY in the environment (.env). Set CONTEXTIFY_MOCK=1 to use fake
+Needs a SerpApi key: pass api_key=... (the backend passes the key the user typed on the
+page), or set SERPAPI_API_KEY in the environment. Set CONTEXTIFY_MOCK=1 to use fake
 offline data for UI testing; mock items are always marked is_mock=True.
 """
 
@@ -79,7 +80,7 @@ class SerpApiProvider:
 
     def search(self, query: str, *, gl: str) -> list[dict[str, Any]]:
         if not self.api_key:
-            raise RuntimeError("SERPAPI_API_KEY is missing (add it to your .env file)")
+            raise RuntimeError("SerpApi key is missing (add it in the API keys box on the page)")
         from serpapi import GoogleSearch  # imported here so tests need no network package
 
         data = GoogleSearch(
@@ -126,17 +127,18 @@ def _normalize_result(result: dict[str, Any], *, is_mock: bool) -> dict[str, Any
     }
 
 
-def _default_provider() -> SearchProvider | None:
+def _default_provider(api_key: str | None = None) -> SearchProvider | None:
     """Mock only if CONTEXTIFY_MOCK=1, otherwise the real SerpApi provider."""
     if os.getenv("CONTEXTIFY_MOCK") == "1":
         return MockSerpApi()
-    return SerpApiProvider()
+    return SerpApiProvider(api_key)
 
 
 def get_regional_news(
     claim: str,
     *,
     provider: SearchProvider | None = None,
+    api_key: str | None = None,
 ) -> dict[str, Any]:
     """Return news results grouped by India, USA and UK.
 
@@ -146,7 +148,7 @@ def get_regional_news(
     results: dict[str, list[dict[str, Any]]] = {r.name: [] for r in REGIONS}
     errors: dict[str, str] = {}
     cleaned_claim = claim.strip() if isinstance(claim, str) else ""
-    search_provider = provider if provider is not None else _default_provider()
+    search_provider = provider if provider is not None else _default_provider(api_key)
     is_mock = bool(getattr(search_provider, "is_mock", False))
 
     if cleaned_claim:

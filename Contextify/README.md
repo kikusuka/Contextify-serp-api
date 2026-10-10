@@ -49,6 +49,7 @@ Without SerpApi there would be no evidence to show: the AI only summarises what 
 - **Allowlist.** Fact-check results are only accepted from a curated list (`backend/factcheck_sites.json`). Broad news sites only count inside their fact-check section.
 - **No invented links.** Gemini only picks evidence IDs; the backend attaches the real links itself.
 - **No evidence, no guessing.** If searches return nothing, the app says so without calling the AI.
+- **Bring your own keys.** Users type their own Gemini and SerpApi keys into the page. Keys stay in the browser, go only to the local backend, are used per request, and are scrubbed from any error message.
 - **Graceful failures.** If one search fails, the others still run and the result reports what was missing.
 - **Agreement is not proof.** Politically charged stories are often covered in a uniform, loaded way. The prompt separates verifiable events from interpretation and flags uniform, emotional coverage.
 
@@ -98,7 +99,6 @@ cd backend
 python -m venv venv
 venv\Scripts\activate
 pip install -r requirements.txt
-copy .env.example .env
 ```
 
 **Mac / Linux**
@@ -108,21 +108,9 @@ cd backend
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env
 ```
 
-### Step 5: Add your keys
-
-Open the new file `backend/.env` in any text editor (Notepad is fine) and replace the placeholders:
-
-```
-GEMINI_API_KEY=paste_your_gemini_key_here
-SERPAPI_API_KEY=paste_your_serpapi_key_here
-```
-
-Save the file. Never share this file or upload it to GitHub (it is already ignored by git).
-
-### Step 6: Start the backend
+### Step 5: Start the backend
 
 In the same terminal:
 
@@ -130,15 +118,17 @@ In the same terminal:
 python app.py
 ```
 
-Leave it running. Open http://localhost:5000/health in your browser. You should see something like:
+Leave it running. Open http://localhost:5000/health in your browser. You should see `"ok": true`.
 
-```
-{"gemini_key_loaded": true, "model": "gemini-2.5-flash", "ok": true}
-```
+### Step 6: Open the app and add your keys
 
-### Step 7: Open the app
+1. Open the `frontend` folder and **double-click `index.html`**. It opens in your browser.
+2. In the **API keys** box at the top, paste your Gemini key and your SerpApi key.
+3. Press **Test keys**. You should see "OK" next to both. (This does not use up SerpApi searches.)
+4. Tick **Remember on this device** if you don't want to paste them again next time, then press **Save keys**.
+5. Paste a claim and press **Check this message**.
 
-Open the `frontend` folder and **double-click `index.html`**. It opens in your browser. Paste a claim and press **Check**.
+**About your keys:** they stay in your browser and are sent only to the backend running on your own computer, which uses them for that request and does not save or log them. There is no `.env` file to edit. Press **Clear** to remove them from the browser. On a shared computer, leave "Remember" unticked.
 
 ---
 
@@ -154,6 +144,7 @@ Paste each of these into the box and press **Check**. Results come from live sea
 
 **Then check these things:**
 
+- **Test keys** shows OK for both keys. Try a wrong key to see a clear error instead of a crash.
 - The loading screen shows steps while it works.
 - A coloured **status badge** appears with a short summary.
 - Every source in the list is a real link that opens the article.
@@ -183,10 +174,10 @@ Open `frontend/script.js` and change `const USE_SAMPLE = false;` to `true`. The 
 |---|---|
 | `python` is not recognised | Reinstall Python and tick "Add to PATH", or use `py` (Windows) / `python3` (Mac, Linux). |
 | `venv\Scripts\activate` is blocked on Windows | Use Command Prompt instead of PowerShell, or run `venv\Scripts\activate.bat`. |
-| `/health` shows `gemini_key_loaded: false` | The `.env` file is missing or in the wrong place. It must be `backend/.env`, with the key on the line `GEMINI_API_KEY=...` and no quotes. |
-| Error mentioning the model name | Gemini model names change. In `backend/.env` add `GEMINI_MODEL=` followed by a current model name from Google AI Studio, then restart. |
-| Page says it "could not get a result" | The backend is not running. Start it again with `python app.py` and keep that terminal open. |
-| Result says a search "failed" or `SERPAPI_API_KEY is missing` | Check the SerpApi key in `.env` and your remaining SerpApi searches. Restart after editing `.env`. |
+| "Add both API keys first" appears | Paste both keys into the API keys box at the top of the page and press **Save keys**. |
+| Error mentioning the model name | Gemini model names change. Set an environment variable `GEMINI_MODEL` to a current model name from Google AI Studio and restart the backend (or edit `GEMINI_MODEL` near the top of `backend/app.py`). |
+| Page says it "could not reach the backend" | The backend is not running. Start it again with `python app.py` and keep that terminal open. |
+| Result says a search "failed" | Press **Test keys** to check the SerpApi key and see how many searches you have left. |
 | Always "No evidence found" | Make sure the claim is specific. Very vague or brand-new claims often have no coverage. |
 
 ---
@@ -224,7 +215,7 @@ backend/
   factcheck_sites.json   curated fact-check site list
   regional_news.py       regional news search (SerpApi google_news, 3 countries)
   sample_result.json     example response
-  .env.example           template for your API keys
+  .env.example           optional, for developers who prefer a .env file
 frontend/
   index.html, style.css, script.js
 tests/                   unit tests for the two search modules

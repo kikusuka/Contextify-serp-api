@@ -1,0 +1,26 @@
+id,claim,expected_result
+1,Drinking lemon water cures cancer,Disputed
+2,NASA confirmed Earth has two moons permanently,No evidence found
+3,Vaccines cause autism,Already fact-checked
+4,The Earth orbits the Sun,Already fact-checked
+5,Humans need oxygen to survive,Already fact-checked
+6,Water boils at 100 degrees Celsius at sea level,Already fact-checked
+7,The Great Wall of China is visible from the Moon with the naked eye,Disputed
+8,Antibiotics treat viral infections such as the common cold,Disputed
+9,Smoking increases the risk of lung cancer,Already fact-checked
+10,Climate change is affected by human activities,Already fact-checked
+11,The Sun revolves around the Earth,Disputed
+12,Eating carrots gives humans night vision,Disputed
+13,Lightning never strikes the same place twice,Disputed
+14,Bats are blind,Disputed
+15,Goldfish have a three-second memory,Disputed
+16,The Earth is flat,Disputed
+17,Humans use only ten percent of their brains,Disputed
+18,The Moon produces its own light,Disputed
+19,Regular handwashing can reduce the spread of germs,Already fact-checked
+20,Seat belts reduce the risk of injury in car crashes,Already fact-checked
+21,Drinking bleach safely cures infections,Disputed
+22,A second moon will appear next week according to NASA,No evidence found
+23,All bacteria are harmful to humans,Disputed
+24,The Pacific Ocean is the largest ocean on Earth,Already fact-checked
+25,The seasons are caused mainly by changes in Earth-Sun distance,Disputed

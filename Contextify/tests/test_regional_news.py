@@ -110,7 +110,25 @@ class RegionalNewsTests(unittest.TestCase):
             os.environ.pop("SERPAPI_API_KEY", None)
             output = get_regional_news("claim", provider=SerpApiProvider(api_key=None))
         self.assertEqual(set(output["errors"]), {r.name for r in REGIONS})
-        self.assertIn("SERPAPI_API_KEY", output["errors"]["India"])
+        self.assertIn("SerpApi key", output["errors"]["India"])
+
+    def test_api_key_argument_reaches_serpapi(self):
+        seen = {}
+
+        class Spy:
+            def __init__(self, params):
+                seen["key"] = params["api_key"]
+
+            def get_dict(self):
+                return {"news_results": []}
+
+        module = types.ModuleType("serpapi")
+        module.GoogleSearch = Spy
+        with mock.patch.dict(os.environ, {"CONTEXTIFY_MOCK": "0", "SERPAPI_API_KEY": ""}):
+            with mock.patch.dict(sys.modules, {"serpapi": module}):
+                output = get_regional_news("claim", api_key="typed-in-key")
+        self.assertEqual(seen["key"], "typed-in-key")
+        self.assertEqual(output["errors"], {})
 
     def test_serpapi_provider_parses_sources_and_story_clusters(self):
         payload = {

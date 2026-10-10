@@ -386,3 +386,65 @@ ul {
     transition: none !important;
   }
 }
+
+.keys {
+  margin-bottom: 18px;
+}
+.keys summary {
+  cursor: pointer;
+  font-weight: 700;
+  list-style-position: inside;
+}
+.keys[open] summary {
+  margin-bottom: 10px;
+}
+.keys label {
+  margin-top: 12px;
+  font-size: 0.92rem;
+}
+.keys label a {
+  margin-left: 6px;
+  font-weight: 500;
+  color: #9fb0ff;
+}
+.keys label.check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+  color: var(--muted);
+}
+input[type="password"] {
+  width: 100%;
+  font: inherit;
+  color: var(--text);
+  padding: 12px 14px;
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+input[type="password"]:focus {
+  outline: none;
+  border-color: var(--violet);
+  box-shadow: 0 0 0 4px rgba(109, 91, 255, 0.25);
+}
+.hint {
+  margin: 0 0 4px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.keys-row {
+  margin-top: 14px;
+}
+#keys-status {
+  margin: 12px 0 0;
+  font-size: 0.92rem;
+  color: var(--muted);
+  white-space: pre-line;
+}
+#keys-status.ok {
+  color: #6ee7b7;
+}
+#keys-status.bad {
+  color: #fecaca;
+}

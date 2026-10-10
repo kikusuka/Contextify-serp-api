@@ -17,6 +17,21 @@
     <span class="pill">Fact-check in seconds</span>
     <h1>Got a forward that feels off? <span class="grad">Check it first.</span></h1>
     <p class="lead">Paste any message. We search fact-checkers and news in India, the US and the UK, then write you a reply with proof.</p>
+    <details id="keys-panel" class="glass keys">
+      <summary id="keys-summary">API keys: add yours to start</summary>
+      <p class="hint">Contextify runs on your own free keys. They stay in this browser and are sent only to the backend on your own computer. The server does not save or log them.</p>
+      <label for="gemini-key">Gemini API key <a href="https://aistudio.google.com" target="_blank" rel="noopener noreferrer">get one</a></label>
+      <input id="gemini-key" type="password" autocomplete="off" spellcheck="false" placeholder="Paste your Gemini key">
+      <label for="serp-key">SerpApi key <a href="https://serpapi.com" target="_blank" rel="noopener noreferrer">get one</a></label>
+      <input id="serp-key" type="password" autocomplete="off" spellcheck="false" placeholder="Paste your SerpApi key">
+      <label class="check"><input id="remember" type="checkbox"> Remember on this device</label>
+      <div class="row keys-row">
+        <button id="save-keys" class="primary">Save keys</button>
+        <button id="test-keys">Test keys</button>
+        <button id="clear-keys">Clear</button>
+      </div>
+      <p id="keys-status" role="status"></p>
+    </details>
     <div class="glass">
       <label for="claim">Message or claim</label>
       <textarea id="claim" rows="6" maxlength="3000" placeholder="Paste a WhatsApp forward here..."></textarea>

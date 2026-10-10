@@ -50,6 +50,104 @@ const STATUS = {
     "We found nothing either way. Treat it with care.",
   ],
 };
+
+// ---------- API keys (typed on the page, kept in this browser only) ----------
+const KEY_STORE = "contextify_keys_v1";
+const CHECK_URL = API_URL.replace("/analyze", "/check-keys");
+
+function readStored() {
+  try {
+    const raw = localStorage.getItem(KEY_STORE) || sessionStorage.getItem(KEY_STORE);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+function getKeys() {
+  return { gemini: $("gemini-key").value.trim(), serp: $("serp-key").value.trim() };
+}
+
+function keyHeaders() {
+  const k = getKeys();
+  return { "X-Gemini-Key": k.gemini, "X-SerpApi-Key": k.serp };
+}
+
+function setKeysStatus(text, kind) {
+  $("keys-status").textContent = text || "";
+  $("keys-status").className = kind || "";
+}
+
+function updateKeysSummary() {
+  const k = getKeys();
+  const ready = k.gemini && k.serp;
+  $("keys-summary").textContent = ready
+    ? "API keys: ready"
+    : "API keys: add yours to start";
+  return ready;
+}
+
+function saveKeys() {
+  const k = getKeys();
+  localStorage.removeItem(KEY_STORE);
+  sessionStorage.removeItem(KEY_STORE);
+  try {
+    // "Remember" keeps them after the browser closes; otherwise only for this tab.
+    ($("remember").checked ? localStorage : sessionStorage).setItem(
+      KEY_STORE,
+      JSON.stringify(k)
+    );
+  } catch {}
+  updateKeysSummary();
+}
+
+async function testKeys() {
+  const k = getKeys();
+  if (!k.gemini || !k.serp) {
+    setKeysStatus("Paste both keys first.", "bad");
+    return;
+  }
+  setKeysStatus("Testing...", "");
+  try {
+    const res = await fetch(CHECK_URL, { method: "POST", headers: keyHeaders() });
+    const r = await res.json();
+    const line = (name, x) =>
+      (x.ok === true ? "OK  " : x.ok === false ? "FAIL  " : "?  ") + name + ": " + x.message;
+    setKeysStatus(
+      line("Gemini", r.gemini) + "\n" + line("SerpApi", r.serpapi),
+      r.gemini.ok && r.serpapi.ok !== false ? "ok" : "bad"
+    );
+  } catch {
+    setKeysStatus("Could not reach the backend. Is `python app.py` running?", "bad");
+  }
+}
+
+function initKeys() {
+  const stored = readStored();
+  $("gemini-key").value = stored.gemini || "";
+  $("serp-key").value = stored.serp || "";
+  $("remember").checked = !!localStorage.getItem(KEY_STORE);
+  $("keys-panel").open = !updateKeysSummary();
+  $("save-keys").onclick = () => {
+    saveKeys();
+    setKeysStatus(
+      updateKeysSummary() ? "Saved." : "Saved. Add both keys to start.",
+      "ok"
+    );
+  };
+  $("test-keys").onclick = () => {
+    saveKeys();
+    testKeys();
+  };
+  $("clear-keys").onclick = () => {
+    $("gemini-key").value = "";
+    $("serp-key").value = "";
+    $("remember").checked = false;
+    saveKeys();
+    setKeysStatus("Keys removed from this browser.", "ok");
+  };
+}
+
 let timer = null;
 
 function show(id) {
@@ -77,7 +175,7 @@ async function getResult(claim) {
   }
   const res = await fetch(API_URL, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...keyHeaders() },
     body: JSON.stringify({ claim }),
   });
   if (!res.ok) {
@@ -94,15 +192,22 @@ async function check() {
     $("claim").focus();
     return;
   }
+  if (!USE_SAMPLE && !updateKeysSummary()) {
+    $("keys-panel").open = true;
+    setKeysStatus("Add both API keys first. They are free to get (see the links).", "bad");
+    $("keys-panel").scrollIntoView({ behavior: "smooth", block: "center" });
+    return;
+  }
+  saveKeys();
   show("loading-view");
   runSteps();
   try {
     render(await getResult(claim));
   } catch (e) {
     $("error-text").textContent =
-      "We could not get a result (" +
-      e.message +
-      "). Check that the backend is running, then try again.";
+      e instanceof TypeError
+        ? "We could not reach the backend. Check that `python app.py` is running, then try again."
+        : e.message + " Please check your keys and try again.";
     show("error-view");
   } finally {
     clearInterval(timer);
@@ -184,3 +289,5 @@ $("copy-btn").onclick = async () => {
   }
   setTimeout(() => ($("copy-btn").textContent = "Copy reply"), 2000);
 };
+
+initKeys();

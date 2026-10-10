@@ -74,7 +74,7 @@ class FactcheckTests(unittest.TestCase):
         with mock.patch.dict(os.environ, {"SERPAPI_API_KEY": ""}):
             with self.assertRaises(RuntimeError) as ctx:
                 factcheck.search_factchecks("claim")
-        self.assertIn("SERPAPI_API_KEY", str(ctx.exception))
+        self.assertIn("SerpApi key", str(ctx.exception))
 
     def test_all_queries_failing_raises_but_one_failure_does_not(self):
         with mock.patch.object(factcheck, "_serpapi_search", side_effect=OSError("down")):
@@ -92,6 +92,18 @@ class FactcheckTests(unittest.TestCase):
         with mock.patch.object(factcheck, "_serpapi_search", side_effect=flaky):
             out = factcheck.search_factchecks("claim")
         self.assertEqual(out[0]["source"], "Snopes")
+
+    def test_key_passed_in_is_used_without_env(self):
+        seen = {}
+
+        def fake(params):
+            seen["key"] = params["api_key"]
+            return {"organic_results": []}
+
+        with mock.patch.dict(os.environ, {"SERPAPI_API_KEY": ""}):
+            with mock.patch.object(factcheck, "_serpapi_search", side_effect=fake):
+                factcheck.search_factchecks("claim", api_key="typed-in-key")
+        self.assertEqual(seen["key"], "typed-in-key")
 
     def test_site_list_is_valid(self):
         sites = factcheck._load_sites()

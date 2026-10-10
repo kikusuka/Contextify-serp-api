@@ -13,7 +13,7 @@ How it works
 
 Raises RuntimeError when the search itself is broken (missing key, SerpApi error) so
 the backend can tell the user a part is missing. A search with no matches returns [].
-Needs the google-search-results package and SERPAPI_API_KEY.
+Needs the google-search-results package and a SerpApi key (passed in by the backend).
 """
 
 from __future__ import annotations
@@ -101,13 +101,17 @@ def _match_site(link: str, sites: list[dict[str, str]]) -> dict[str, str] | None
     return None
 
 
-def search_factchecks(claim: str) -> list[dict[str, str]]:
-    """Find up to five fact-check articles matching *claim*."""
+def search_factchecks(claim: str, api_key: str | None = None) -> list[dict[str, str]]:
+    """Find up to five fact-check articles matching *claim*.
+
+    api_key: the user's SerpApi key (sent from the web page). Falls back to the
+    SERPAPI_API_KEY environment variable if not given.
+    """
     if not isinstance(claim, str) or not claim.strip():
         return []
-    api_key = os.getenv("SERPAPI_API_KEY", "").strip()
+    api_key = (api_key or os.getenv("SERPAPI_API_KEY", "")).strip()
     if not api_key:
-        raise RuntimeError("SERPAPI_API_KEY is missing (add it to your .env file)")
+        raise RuntimeError("SerpApi key is missing (add it in the API keys box on the page)")
     sites = _load_sites()
     if not sites:
         raise RuntimeError("factcheck_sites.json is missing or invalid")
